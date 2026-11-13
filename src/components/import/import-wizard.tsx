@@ -14,7 +14,7 @@ import { CompareStage } from "./compare-stage";
 import { DownloadStage } from "./download-stage";
 
 function useUploadSettings() {
-  const s = useApi<{ settings: AppSettings; uploadMode?: "blob" | "server" }>("/api/settings");
+  const s = useApi<{ settings: AppSettings; uploadMode?: "blob" | "blob-presigned" | "server" }>("/api/settings");
   return { maxUploadMb: s.data?.settings.maxUploadMb ?? 50, uploadMode: s.data?.uploadMode ?? "server" };
 }
 

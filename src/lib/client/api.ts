@@ -85,7 +85,14 @@ export function uploadFile<T>(url: string, file: File, onProgress: (fraction: nu
  * Upload a file straight from the browser to the private Vercel Blob store (used on Vercel, where a request to the server may
  * be at most 4.5 MB), then let the server read and check it. Same handle as uploadFile: a promise and a way to cancel.
  */
-export function uploadFileViaBlob<T>(url: string, importId: string, role: "template" | "source", file: File, onProgress: (fraction: number) => void) {
+export function uploadFileViaBlob<T>(
+  url: string,
+  importId: string,
+  role: "template" | "source",
+  file: File,
+  onProgress: (fraction: number) => void,
+  mode: "blob" | "blob-presigned",
+) {
   const ctrl = new AbortController();
   const promise = (async () => {
     // Only letters, digits, dots, dashes and underscores in the temporary name; the server adds a random suffix.
@@ -93,8 +100,9 @@ export function uploadFileViaBlob<T>(url: string, importId: string, role: "templ
     const base = file.name.replace(/\.[^.]*$/, "").replace(/[^A-Za-z0-9_-]+/g, "_").slice(0, 60) || "file";
     let pathname: string;
     try {
-      const { upload } = await import("@vercel/blob/client");
-      const blob = await upload(`incoming/${importId}/${role}/${base}.${ext}`, file, {
+      const { upload, uploadPresigned } = await import("@vercel/blob/client");
+      const uploadToBlob = mode === "blob-presigned" ? uploadPresigned : upload;
+      const blob = await uploadToBlob(`incoming/${importId}/${role}/${base}.${ext}`, file, {
         access: "private",
         handleUploadUrl: "/api/uploads",
         multipart: file.size > 8 * 1024 * 1024,

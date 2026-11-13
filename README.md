@@ -94,14 +94,17 @@ The end-to-end tests create imports in the configured database — run them agai
 ## Deploying on Vercel
 
 Vercel has no permanent disk and accepts at most 4.5 MB per request, so on Vercel the app keeps all files in a **private
-Vercel Blob store** (browsers upload large files straight to it) and uses an online **Postgres** database (Neon). Nothing else
-changes; without `BLOB_READ_WRITE_TOKEN` the app keeps using the local `storage` folder.
+Vercel Blob store** (browsers upload large files straight to it) and uses an online **Postgres** database (Neon). Blob uploads
+support Vercel OIDC or a read-write token; the default upload limit is 50 MB and can be changed in Settings.
 
 1. Install the CLI if needed (`npm i -g vercel`), then in this folder: `vercel login` and `vercel link` (creates the project).
 2. In the Vercel dashboard → the project → **Storage**:
    - **Create Database → Neon (Postgres)**, region **Frankfurt (eu-central-1)**, connect it to all environments. This sets `DATABASE_URL`.
      The tables are created automatically on first use.
-   - **Create → Blob**, choose **Private** access, connect it to all environments. This sets `BLOB_READ_WRITE_TOKEN`.
+   - **Create → Blob**, choose **Private** access, and connect it to the project in Production, Preview, and Development.
+     The standard connection provides `BLOB_STORE_ID`, `VERCEL_OIDC_TOKEN`, and `BLOB_WEBHOOK_PUBLIC_KEY`; these enable private
+     OIDC-authenticated server storage and presigned browser uploads. A `BLOB_READ_WRITE_TOKEN` is optional and continues to
+     enable the existing token-based browser upload flow.
 3. Deploy: `vercel --prod`.
 
 `vercel.json` runs the functions in Frankfurt (`fra1`), close to the database. `.vercelignore` keeps `storage/`, `test-data/` and

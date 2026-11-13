@@ -33,7 +33,13 @@ export function sha256(buf: Buffer | Uint8Array): string {
 
 /** True when files are kept in Vercel Blob instead of the local folder. */
 export function blobEnabled(): boolean {
-  return Boolean(process.env.BLOB_READ_WRITE_TOKEN);
+  return blobUploadMode() !== "server";
+}
+
+export function blobUploadMode(): "server" | "blob" | "blob-presigned" {
+  if (process.env.BLOB_READ_WRITE_TOKEN) return "blob";
+  if (process.env.VERCEL_OIDC_TOKEN && process.env.BLOB_STORE_ID) return "blob-presigned";
+  return "server";
 }
 
 // ------------------------------------------------------------------ backends

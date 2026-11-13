@@ -40,8 +40,8 @@ export function UploadStage({
   importId: string | null;
   detail: ImportDetailResponse | null;
   maxUploadMb: number;
-  /** "blob": the browser uploads straight to Vercel Blob (on Vercel); "server": through this server. */
-  uploadMode?: "blob" | "server";
+  /** Blob modes upload directly to Vercel Blob; server mode sends the file through this server. */
+  uploadMode?: "blob" | "blob-presigned" | "server";
   ensureImport: () => Promise<string>;
   onChanged: () => void;
   onAnalyze: () => void;
@@ -118,7 +118,7 @@ function FileSlot({
   importId: string | null;
   file: UploadedFile | null;
   maxUploadMb: number;
-  uploadMode: "blob" | "server";
+  uploadMode: "blob" | "blob-presigned" | "server";
   ensureImport: () => Promise<string>;
   onUploaded: (duplicateOf: DuplicateRef[]) => void;
 }) {
@@ -155,7 +155,10 @@ function FileSlot({
     type Result = { file: UploadedFile; duplicateOf: DuplicateRef[] };
     const onProgress = (p: number) => setState((s) => (s.kind === "uploading" ? { ...s, progress: p } : s));
     const url = `/api/imports/${id}/files/${role}`;
-    const up = uploadMode === "blob" ? uploadFileViaBlob<Result>(url, id, role, f, onProgress) : uploadFile<Result>(url, f, onProgress);
+    const up =
+      uploadMode === "server"
+        ? uploadFile<Result>(url, f, onProgress)
+        : uploadFileViaBlob<Result>(url, id, role, f, onProgress, uploadMode);
     setState({ kind: "uploading", name: f.name, size: f.size, progress: 0, abort: up.abort });
     try {
       const res = await up.promise;

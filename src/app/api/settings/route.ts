@@ -1,13 +1,13 @@
 import { connection } from "next/server";
 import { handle, jsonBody } from "@/lib/server/http";
 import { getSettings, saveSettings } from "@/lib/server/repo";
-import { HttpError, blobEnabled } from "@/lib/server/storage";
+import { HttpError, blobUploadMode } from "@/lib/server/storage";
 import { DEFAULT_SETTINGS, type AppSettings } from "@/lib/types";
 
 export async function GET() {
   await connection();
-  // uploadMode tells the browser how to upload: straight to Vercel Blob (on Vercel) or through this server.
-  return handle(async () => ({ settings: await getSettings(), uploadMode: blobEnabled() ? "blob" : "server" }));
+  // uploadMode tells the browser which secure upload flow the configured storage supports.
+  return handle(async () => ({ settings: await getSettings(), uploadMode: blobUploadMode() }));
 }
 
 export async function PUT(req: Request) {
