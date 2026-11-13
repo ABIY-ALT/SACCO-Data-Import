@@ -1,0 +1,39 @@
+{
+  "name": "sacco-data-import",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint",
+    "test": "vitest run",
+    "sample-data": "node scripts/make-sample-data.mjs",
+    "test:e2e": "node scripts/e2e-api.mjs",
+    "test:edge": "node scripts/e2e-edge-cases.mjs",
+    "test:ui": "node scripts/e2e-ui.mjs"
+  },
+  "dependencies": {
+    "@vercel/blob": "^2.9.0",
+    "exceljs": "^4.4.0",
+    "lucide-react": "^1.72.0",
+    "next": "16.4.6",
+    "pg": "^8.23.1",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
+  },
+  "devDependencies": {
+    "@tailwindcss/turbopack": "4.3.3",
+    "@types/node": "^24.19.2",
+    "@types/pg": "^8.23.1",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "16.4.6",
+    "playwright-core": "^1.65.0",
+    "tailwindcss": "4.3.3",
+    "typescript": "^5",
+    "vitest": "^5.1.0"
+  }
+}
