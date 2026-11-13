@@ -285,7 +285,7 @@ function UploadedCard({
   );
   const headers = (preview.data?.headers ?? []).map((h) => h.trim()).filter(Boolean);
 
-  async function change(body: { sheet?: string; headerRow?: number }) {
+  async function change(body: { sheet?: string; headerRow?: number; headerRows?: number }) {
     setSaving(true);
     setError(null);
     try {
@@ -349,6 +349,24 @@ function UploadedCard({
         </Field>
       </div>
 
+      {role === "source" && (
+        <label className={`flex items-start gap-2 text-sm ${file.headerRow < 2 ? "text-slate-400" : "text-slate-700"}`}>
+          <input
+            type="checkbox"
+            checked={(file.headerRows ?? 1) === 2}
+            disabled={saving || file.headerRow < 2}
+            onChange={(e) => change({ headerRows: e.target.checked ? 2 : 1 })}
+            className="mt-0.5 accent-brand-600"
+          />
+          <span>
+            {t("The column headers use 2 rows (a merged title above sub-titles)")}
+            <span className="block text-xs text-slate-500">
+              {t("Row {a} and row {b} are combined, e.g. “Regular loan” + “Principal” → “Regular loan Principal”.", { a: Math.max(1, file.headerRow - 1), b: file.headerRow })}
+            </span>
+          </span>
+        </label>
+      )}
+
       <div className="flex flex-wrap items-center gap-2 text-sm">
         <Badge tone="slate">{file.columnCount === 1 ? t("{n} column", { n: 1 }) : t("{n} columns", { n: file.columnCount })}</Badge>
         <Badge tone="slate">{file.dataRowCount === 1 ? t("{n} data row", { n: 1 }) : t("{n} data rows", { n: file.dataRowCount })}</Badge>
@@ -376,7 +394,16 @@ function UploadedCard({
           <table className="min-w-full text-xs">
             <tbody>
               {preview.data.rows.map((r, i) => (
-                <tr key={i} className={i + 1 === file.headerRow ? "bg-brand-50 font-semibold text-brand-900" : i + 1 < file.headerRow ? "text-slate-400" : ""}>
+                <tr
+                  key={i}
+                  className={
+                    i + 1 === file.headerRow || (file.headerRows === 2 && i + 2 === file.headerRow)
+                      ? "bg-brand-50 font-semibold text-brand-900"
+                      : i + 1 < file.headerRow
+                        ? "text-slate-400"
+                        : ""
+                  }
+                >
                   <td className="sticky left-0 border-r border-slate-200 bg-slate-50 px-2 py-1 text-right text-slate-400">{i + 1}</td>
                   {r.slice(0, 12).map((c, j) => (
                     <td key={j} className="max-w-40 truncate border-b border-slate-100 px-2 py-1 whitespace-nowrap">

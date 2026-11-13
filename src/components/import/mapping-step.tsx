@@ -369,16 +369,28 @@ function MappingRow({
         )}
         {fill?.locked || m.useTemplate ? null : (
           <>
-            <select className={inputCls} value={m.source === null ? "" : String(m.source)} onChange={(e) => onSource(e.target.value)} aria-label={t("Original column for {col}", { col: col.label })}>
-              <option value="">{t("— Not in the original file —")}</option>
-              {(s && !options.includes(s) ? [...options, s] : options).map((x) => (
-                <option key={x.index} value={x.index}>
-                  {x.letter}: {x.label}
-                  {x.empty ? ` (${t("empty")})` : ""}
-                </option>
-              ))}
-            </select>
-            {s ? (
+            {m.combine ? (
+              <div className="rounded-md border border-brand-200 bg-brand-50/60 px-2.5 py-2 text-xs text-slate-700">
+                <div className="font-medium text-brand-900">{m.combine.op === "sum" ? t("Sum of:") : t("Joined from:")}</div>
+                <div className="mt-0.5">
+                  {m.combine.sources.map((i) => `${sources[i]?.letter}: ${sources[i]?.label}`).join(m.combine.op === "sum" ? " + " : " & ")}
+                </div>
+                <button type="button" onClick={onSettings} className="mt-1 font-medium text-brand-700 hover:underline">
+                  {t("Change")}
+                </button>
+              </div>
+            ) : (
+              <select className={inputCls} value={m.source === null ? "" : String(m.source)} onChange={(e) => onSource(e.target.value)} aria-label={t("Original column for {col}", { col: col.label })}>
+                <option value="">{t("— Not in the original file —")}</option>
+                {(s && !options.includes(s) ? [...options, s] : options).map((x) => (
+                  <option key={x.index} value={x.index}>
+                    {x.letter}: {x.label}
+                    {x.empty ? ` (${t("empty")})` : ""}
+                  </option>
+                ))}
+              </select>
+            )}
+            {m.combine ? null : s ? (
               <div className="mt-1.5 truncate text-xs text-slate-500" title={s.samples.join(" · ")}>
                 <span className="text-slate-400">{t("e.g.")}</span> {s.samples.slice(0, 3).join(" · ") || t("(no values)")}
               </div>

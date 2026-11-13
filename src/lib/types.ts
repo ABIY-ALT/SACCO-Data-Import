@@ -31,6 +31,8 @@ export interface UploadedFile {
   sheet: string; // selected sheet
   sheetChosen?: boolean; // the user picked the sheet (it is never switched automatically)
   headerRow: number; // 1-based row number of the header row
+  /** Original file only: 2 = the headers use two rows (headerRow - 1 and headerRow), e.g. a merged title over sub-titles. */
+  headerRows?: 1 | 2;
   headerRowDetected: number;
   columnCount: number;
   dataRowCount: number; // non-blank rows below the header

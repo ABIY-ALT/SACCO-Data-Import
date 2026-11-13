@@ -10,6 +10,7 @@ import { useT } from "@/components/i18n";
 import { Alert, Badge, Button, Card, Drawer, LoadingBlock, StatCard, inputClass } from "@/components/ui";
 import type { CompareContext } from "./compare-stage";
 import { SourceSwitch, TEMPLATE_TAG_LABEL, TemplateChanges } from "./template-changes";
+import { FindReplace, ProblemFix } from "./bulk-fix";
 
 type Filter = "all" | "ready" | "errors" | "warnings" | "duplicates" | "changed" | "template" | "excluded";
 
@@ -143,8 +144,15 @@ export function ValidationStep({ ctx }: { ctx: CompareContext }) {
               );
             })}
           </div>
+          {activeIssue ? (
+            <ProblemFix key={`${activeIssue.code}-${activeIssue.col}`} ctx={ctx} issue={activeIssue} />
+          ) : (
+            <p className="mt-3 text-xs text-slate-500">{t("Click a problem to see its rows and to fix all of them at once.")}</p>
+          )}
         </Card>
       )}
+
+      <FindReplace ctx={ctx} />
 
       <Card padded={false}>
         <div className="flex flex-col gap-3 border-b border-slate-200 px-4 py-3 lg:flex-row lg:items-center lg:justify-between">

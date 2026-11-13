@@ -34,6 +34,46 @@ import {
 export interface SheetData {
   name: string;
   rows: RawCell[][];
+  /** Cells merged across columns near the top of the sheet (0-based rows r..r2, columns c1..c2), e.g. a title over sub-titles. */
+  merges?: { r: number; r2: number; c1: number; c2: number }[];
+}
+
+/**
+ * Column headers on two rows, e.g. "Regular loan" merged over "Principal" | "Interest": the header row becomes
+ * "Regular loan Principal" | "Regular loan Interest". Only the header row changes; the data rows stay as they are.
+ * Without merge information, a blank cell of the upper row takes the title on its left while the row below has a sub-title.
+ */
+export function mergeHeaderRows(sheet: SheetData, headerRow: number): SheetData {
+  if (headerRow < 2) return sheet;
+  const upperIdx = headerRow - 2;
+  const upper = sheet.rows[upperIdx] ?? [];
+  const lower = sheet.rows[headerRow - 1] ?? [];
+  const text = (c: RawCell | undefined) => rawToText(c ?? null).trim();
+  const width = Math.max(upper.length, lower.length);
+  const top: string[] = [];
+  if (sheet.merges) {
+    for (let c = 0; c < width; c++) top[c] = text(upper[c]);
+    for (const m of sheet.merges)
+      if (m.r <= upperIdx && m.r2 >= upperIdx) for (let c = m.c1; c <= m.c2 && c < width; c++) top[c] = text(sheet.rows[m.r]?.[m.c1]);
+  } else {
+    let carry = "";
+    for (let c = 0; c < width; c++) {
+      const up = text(upper[c]);
+      const low = text(lower[c]);
+      if (up) carry = up;
+      else if (!low) carry = "";
+      top[c] = up || (low ? carry : "");
+    }
+  }
+  const merged: RawCell[] = [];
+  for (let c = 0; c < width; c++) {
+    const low = text(lower[c]);
+    const label = top[c] && low && top[c] !== low ? `${top[c]} ${low}` : top[c] || low;
+    merged.push(label === "" ? null : label);
+  }
+  const rows = sheet.rows.slice();
+  rows[headerRow - 1] = merged;
+  return { ...sheet, rows };
 }
 
 export interface TemplateMeta {

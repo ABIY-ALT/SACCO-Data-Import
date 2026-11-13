@@ -1124,5 +1124,63 @@ export const AM: Record<string, string> = {
   "This file uses the Ethiopian calendar ({month}). If its date columns are Ethiopian dates written only with numbers, open the column rules (⚙) and set Calendar to Ethiopian.":
     "ይህ ፋይል የኢትዮጵያ ዘመን አቆጣጠር ይጠቀማል ({month})። የቀን አምዶቹ በቁጥር ብቻ የተጻፉ የኢትዮጵያ ቀኖች ከሆኑ የአምዱን ደንቦች (⚙) ከፍተው የዘመን አቆጣጠሩን «የኢትዮጵያ» ያድርጉት።",
 
+  // ———————————————————————————————————————————— combining columns
+  "Combine several original columns": "ብዙ የኦሪጅናል አምዶችን ማዋሃድ",
+  "Fill this column from several original columns": "ይህን አምድ ከብዙ የኦሪጅናል አምዶች ሙላ",
+  "For example Full Name = Name + Father's name, or Total = Savings + Interest.": "ለምሳሌ ሙሉ ስም = ስም + የአባት ስም፣ ወይም ድምር = ቁጠባ + ወለድ።",
+  "Join the texts": "ጽሑፎቹን አገናኝ",
+  "Add the numbers": "ቁጥሮቹን ደምር",
+  "Put between the texts": "በጽሑፎቹ መካከል የሚገባ",
+  "A space by default. For example a space, a comma or a dash.": "በመጀመሪያ ክፍት ቦታ ነው። ለምሳሌ ክፍት ቦታ፣ ኮማ ወይም ሰረዝ።",
+  "Columns, in order (click to add or remove):": "አምዶቹ በቅደም ተከተል (ለመጨመር ወይም ለማስወገድ ይጫኑ)፦",
+  "Choose at least 2 columns.": "ቢያንስ 2 አምዶችን ይምረጡ።",
+  "Result: {formula}": "ውጤት፦ {formula}",
+  "Sum of:": "የሚደመሩት፦",
+  "Joined from:": "የተገናኙት፦",
+
+  // ———————————————————————————————————————————— fixing many rows at once
+  "{n} row changed.": "{n} ረድፍ ተቀይሯል።",
+  "{n} rows changed.": "{n} ረድፎች ተቀይረዋል።",
+  "Fix all {n} rows with this problem at once:": "ይህ ችግር ያለባቸውን ሁሉንም {n} ረድፎች በአንድ ጊዜ ያስተካክሉ፦",
+  "Exclude these rows": "እነዚህን ረድፎች አግልል",
+  or: "ወይም",
+  "New value": "አዲስ እሴት",
+  "Use this value for all": "ይህን እሴት ለሁሉም ተጠቀም",
+  "Use the template's value": "የቴምፕሌቱን እሴት ተጠቀም",
+  "Change {n} row?": "{n} ረድፍ ይቀየር?",
+  "Change {n} rows?": "{n} ረድፎች ይቀየሩ?",
+  "The {n} rows with this problem will be left out of the final file.": "ይህ ችግር ያለባቸው {n} ረድፎች ከመጨረሻው ፋይል ይገለላሉ።",
+  "Column “{col}” of the {n} rows gets the value “{v}”.": "የ{n} ረድፎቹ አምድ «{col}» እሴቱን «{v}» ያገኛል።",
+  "Column “{col}” of the {n} rows gets the template's value.": "የ{n} ረድፎቹ አምድ «{col}» የቴምፕሌቱን እሴት ያገኛል።",
+  "You can undo each row later in the row inspector.": "እያንዳንዱን ረድፍ በኋላ በረድፍ መመልከቻው ውስጥ መቀልበስ ይችላሉ።",
+  "Find and replace": "ፈልግና ተካ",
+  "change the same value in many rows at once": "በብዙ ረድፎች ውስጥ ያለ ተመሳሳይ እሴትን በአንድ ጊዜ ይቀይሩ",
+  "Find (value in the original file)": "ፈልግ (በኦሪጅናል ፋይሉ ውስጥ ያለ እሴት)",
+  "empty cells": "ባዶ ሴሎች",
+  "Replace with": "በዚህ ተካ",
+  "Replace all": "ሁሉንም ተካ",
+  "Not case-sensitive. Leave “Find” empty to fill the empty cells of the column. Each changed cell can be undone in the row inspector.":
+    "ትልቅና ትንሽ ፊደልን አይለይም። የአምዱን ባዶ ሴሎች ለመሙላት «ፈልግ»ን ባዶ ይተዉት። እያንዳንዱ የተቀየረ ሴል በረድፍ መመልከቻው ውስጥ ሊቀለበስ ይችላል።",
+  "Replace in column “{col}”?": "በአምድ «{col}» ውስጥ ይተካ?",
+  "Every empty cell of column “{col}” gets “{v}”.": "የአምድ «{col}» እያንዳንዱ ባዶ ሴል «{v}» ያገኛል።",
+  "Every row whose original value in column “{col}” is “{find}” gets “{v}”.": "በአምድ «{col}» ውስጥ ኦሪጅናል እሴቱ «{find}» የሆነ እያንዳንዱ ረድፍ «{v}» ያገኛል።",
+  "Click a problem to see its rows and to fix all of them at once.": "ረድፎቹን ለማየትና ሁሉንም በአንድ ጊዜ ለማስተካከል ችግሩን ይጫኑ።",
+  "Many rows changed at once": "ብዙ ረድፎች በአንድ ጊዜ ተቀየሩ",
+  "Choose a problem first.": "መጀመሪያ ችግሩን ይምረጡ።",
+  "No rows match.": "የሚስማማ ረድፍ የለም።",
+
+  // ———————————————————————————————————————————— headers on two rows
+  "The column headers use 2 rows (a merged title above sub-titles)": "የአምድ ርዕሶቹ 2 ረድፎችን ይጠቀማሉ (ከንዑስ ርዕሶች በላይ የተዋሃደ ርዕስ)",
+  "Row {a} and row {b} are combined, e.g. “Regular loan” + “Principal” → “Regular loan Principal”.":
+    "ረድፍ {a} እና ረድፍ {b} ይዋሃዳሉ፤ ለምሳሌ «መደበኛ ብድር» + «ዋና» → «መደበኛ ብድር ዋና»።",
+
+  // ———————————————————————————————————————————— login
+  "Please log in to continue.": "ለመቀጠል እባክዎ ይግቡ።",
+  Password: "የይለፍ ቃል",
+  "Log in": "ግባ",
+  "Log out": "ውጣ",
+  "Please log in first.": "እባክዎ መጀመሪያ ይግቡ።",
+  "Wrong password.": "የተሳሳተ የይለፍ ቃል።",
+
   // —— end ——
 };

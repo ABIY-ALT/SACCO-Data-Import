@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { FileCheck2, FileSpreadsheet, History, LayoutDashboard, Settings, UploadCloud, Workflow } from "lucide-react";
+import { usePathname, useRouter } from "next/navigation";
+import { FileCheck2, FileSpreadsheet, History, LayoutDashboard, LogOut, Settings, UploadCloud, Workflow } from "lucide-react";
+import { apiSend, useApi } from "@/lib/client/api";
 import { tk } from "@/lib/i18n";
 import { LangSwitch, useT } from "@/components/i18n";
 
@@ -19,6 +20,26 @@ function isActive(pathname: string, href: string) {
   if (href === "/") return pathname === "/";
   if (href === "/imports/new") return pathname.startsWith("/imports");
   return pathname.startsWith(href);
+}
+
+/** Shown only when the app is protected by a password (APP_PASSWORD). */
+function LogoutButton() {
+  const t = useT();
+  const router = useRouter();
+  const auth = useApi<{ enabled: boolean; loggedIn: boolean }>("/api/auth");
+  if (!auth.data?.enabled || !auth.data.loggedIn) return null;
+  return (
+    <button
+      type="button"
+      onClick={async () => {
+        await apiSend("DELETE", "/api/auth").catch(() => {});
+        router.replace("/login");
+      }}
+      className="mt-3 inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-slate-800"
+    >
+      <LogOut className="h-3.5 w-3.5" /> {t("Log out")}
+    </button>
+  );
 }
 
 /** Reads the current URL to highlight the active page (must be rendered inside <Suspense>). */
@@ -62,6 +83,7 @@ export function SidebarFrame({ pathname }: { pathname: string | null }) {
       <div className="mt-auto hidden px-5 pt-8 pb-6 lg:block">
         <div className="mb-1.5 text-xs font-medium text-slate-500">{t("Language")}</div>
         <LangSwitch />
+        <LogoutButton />
         <div className="mt-4 text-xs leading-relaxed text-slate-400">{t("Original files are never changed. Every import is kept in the history for auditing.")}</div>
       </div>
     </aside>

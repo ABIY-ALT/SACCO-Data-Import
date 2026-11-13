@@ -46,6 +46,6 @@ export async function PATCH(req: Request, ctx: Ctx) {
   return handle(async () => {
     const id = await idParam(ctx);
     const r = role((await ctx.params).role);
-    return selectSheet(id, r, await jsonBody<{ sheet?: string; headerRow?: number }>(req));
+    return selectSheet(id, r, await jsonBody<{ sheet?: string; headerRow?: number; headerRows?: number }>(req));
   });
 }

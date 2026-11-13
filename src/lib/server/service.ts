@@ -30,11 +30,12 @@ import {
   dataWidth,
   dateOrderEvidence,
   detectHeaderRow,
+  mergeHeaderRows,
   suggestMappings,
   templateSignature,
   type SheetData,
 } from "../core/analyze";
-import { runPipeline, toApiRow, displayValue, type PipelineResult } from "../core/pipeline";
+import { runPipeline, toApiRow, displayValue, issueLabel, originalText, type PipelineResult } from "../core/pipeline";
 import { buildMemberIndex, idKey, type LearnedMember, type MemberIndex } from "../core/members";
 import { personNameKey } from "../core/ethiopic";
 import { detectFill, detectTotalColumn, moneyColumns, numberOf, sameMonth, sheetMonth, templateMonth } from "../core/structure";
@@ -179,7 +180,7 @@ async function duplicatesOf(id: string, hash: string | null | undefined) {
   return rows.map((r) => ({ id: r.id, name: r.name, completedAt: r.completed_at?.toISOString() ?? null, status: r.status }));
 }
 
-export async function selectSheet(id: string, role: FileRole, body: { sheet?: string; headerRow?: number }) {
+export async function selectSheet(id: string, role: FileRole, body: { sheet?: string; headerRow?: number; headerRows?: number }) {
   const imp = await repo.getImport(id);
   assertEditable(imp);
   const file = role === "template" ? imp.template : imp.source;
@@ -189,8 +190,9 @@ export async function selectSheet(id: string, role: FileRole, body: { sheet?: st
     if (!file.sheets.some((s) => s.name === body.sheet)) throw new HttpError(400, "Unknown sheet.");
     next.sheet = body.sheet;
     next.sheetChosen = true;
+    next.headerRows = 1; // another sheet: its header is detected again
   }
-  const sheet = await loadSheet(id, next);
+  const sheet = await loadSheet(id, { ...next, headerRows: 1 });
   if (body.sheet !== undefined && body.headerRow === undefined) {
     next.headerRow = detectHeaderRow(sheet.rows);
     next.headerRowDetected = next.headerRow;
@@ -200,12 +202,15 @@ export async function selectSheet(id: string, role: FileRole, body: { sheet?: st
     if (!Number.isFinite(hr) || hr < 1 || hr > Math.max(1, sheet.rows.length)) throw new HttpError(400, `Header row must be between 1 and ${sheet.rows.length}.`);
     next.headerRow = hr;
   }
+  // Headers on two rows (original file only): the row above the header row is combined with it.
+  if (body.headerRows !== undefined) next.headerRows = Number(body.headerRows) === 2 ? 2 : 1;
+  if (role !== "source" || next.headerRow < 2) next.headerRows = 1;
   next.columnCount = dataWidth(sheet.rows, next.headerRow);
   next.dataRowCount = countDataRows(sheet.rows, next.headerRow);
   await repo.updateImport(id, { [role]: next, analysis: null, config: null, summary: null, stats: null, status: "draft" });
   invalidate(id);
-  await repo.logEvent(id, "file_settings_changed", { role, sheet: next.sheet, headerRow: next.headerRow });
-  return { file: next, headers: headerPreview(sheet, next.headerRow) };
+  await repo.logEvent(id, "file_settings_changed", { role, sheet: next.sheet, headerRow: next.headerRow, headerRows: next.headerRows ?? 1 });
+  return { file: next, headers: headerPreview(await loadSheet(id, next), next.headerRow) };
 }
 
 function headerPreview(sheet: SheetData, headerRow: number): string[] {
@@ -235,7 +240,7 @@ async function loadSheet(id: string, file: UploadedFile): Promise<SheetData> {
   const idx = file.sheets.findIndex((s) => s.name === file.sheet);
   const key = `${id}:source:${file.storedName}:${idx}`;
   const hit = cache.sheets.get(key);
-  if (hit) return hit;
+  if (hit) return withHeaderRows(hit, file);
   let sheet = await readCache<SheetData>(id, `source-${idx}.json`);
   if (!sheet) {
     const parsed = parseWorkbook(await readUpload(id, file.storedName), file.ext, { template: false });
@@ -244,7 +249,12 @@ async function loadSheet(id: string, file: UploadedFile): Promise<SheetData> {
   }
   if (!sheet) throw new HttpError(400, `Sheet "${file.sheet}" not found.`);
   cache.sheets.set(key, sheet);
-  return sheet;
+  return withHeaderRows(sheet, file);
+}
+
+/** Headers on two rows: every reader of the original sheet sees one combined header row. */
+function withHeaderRows(sheet: SheetData, file: UploadedFile): SheetData {
+  return file.headerRows === 2 ? mergeHeaderRows(sheet, file.headerRow) : sheet;
 }
 
 export async function filePreview(id: string, role: FileRole) {
@@ -762,6 +772,74 @@ export async function editRow(
     summary: result.summary,
     row: r ? toApiRow(r, imp.analysis.targets, config, sheet, imp.source.headerRow) : null,
   };
+}
+
+// ------------------------------------------------------------------ fixing many rows at once
+
+export type BulkOp = "exclude" | "set" | "template" | "replace";
+
+/**
+ * Fix many rows at once.
+ * - exclude / set / template: every row that has the chosen problem (code + column): exclude it, give the column one value,
+ *   or take the template's value (templates that list the members);
+ * - replace: every row whose ORIGINAL value in the column equals `find` (not case-sensitive; empty `find` = empty cells) gets `value`.
+ * Each change is an ordinary correction / exclusion / choice, so it can still be undone row by row, and it is in the audit log.
+ */
+export async function bulkFix(id: string, body: { op?: string; code?: string; col?: number; value?: string; find?: string }) {
+  const imp = await repo.getImport(id);
+  assertEditable(imp);
+  if (!imp.analysis || !imp.config || !imp.source) throw new HttpError(400, "Analyze the files first.");
+  const op = body.op as BulkOp;
+  if (!["exclude", "set", "template", "replace"].includes(op)) throw new HttpError(400, "Unknown action.");
+  const targets = imp.analysis.targets;
+  const config: ImportConfig = structuredClone(imp.config);
+  const fill = config.mode === "fill" ? config.fill : null;
+  const col = body.col === undefined || body.col === null ? -1 : Math.floor(Number(body.col));
+  if (op !== "exclude" && !targets[col]) throw new HttpError(400, "Invalid column.");
+  if (op !== "exclude" && fill && (col === fill.keyTarget || col === fill.nameTarget))
+    throw new HttpError(400, "Member ID and name always come from the template's member list. Choose a different member on the Members step instead.");
+  if (op === "template" && !fill) throw new HttpError(400, "Values can only be taken from the template when the template lists the members.");
+  const value = String(body.value ?? "").slice(0, 2000);
+
+  const settings = await repo.getSettings();
+  const result = await runCached(id, imp, config, settings);
+  let rows: PipelineResult["rows"];
+  if (op === "replace") {
+    const sheet = await loadSheet(id, imp.source);
+    const m = config.mappings.find((x) => x.target === targets[col].index)!;
+    const find = String(body.find ?? "").trim().toLowerCase();
+    rows = result.rows.filter((r) => originalText(sheet.rows[imp.source!.headerRow + r.i], m).trim().toLowerCase() === find);
+  } else {
+    if (!body.code) throw new HttpError(400, "Choose a problem first.");
+    rows = result.rows.filter((r) => r.issues.some((x) => x.code === body.code && x.col === col));
+  }
+  if (rows.length === 0) throw new HttpError(400, "No rows match.");
+
+  for (const r of rows) {
+    const key = String(r.i);
+    if (op === "exclude") {
+      if (!config.excluded.includes(r.i)) config.excluded.push(r.i);
+    } else if (op === "set" || op === "replace") {
+      (config.edits[key] ??= {})[String(col)] = value;
+    } else {
+      ((config.cellSources ??= {})[key] ??= {})[String(col)] = "template";
+      if (config.edits[key]) {
+        delete config.edits[key][String(col)];
+        if (Object.keys(config.edits[key]).length === 0) delete config.edits[key];
+      }
+    }
+  }
+  await repo.logEvent(id, "bulk_fix", {
+    op,
+    problem: body.code ? issueLabel(body.code) : null,
+    column: col >= 0 ? targets[col].label : null,
+    rows: rows.length,
+    find: op === "replace" ? String(body.find ?? "") : null,
+    value: op === "set" || op === "replace" ? value : null,
+  });
+  const next = await runCached(id, imp, config, settings);
+  await repo.updateImport(id, { config, summary: next.summary, stats: statsOf(next.summary) });
+  return { summary: next.summary, changed: rows.length };
 }
 
 /** Distinct values of an original column (for value mapping of gender / list columns). */

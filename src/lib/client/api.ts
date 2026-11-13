@@ -27,6 +27,13 @@ async function parse<T>(res: Response): Promise<T> {
   }
   if (!res.ok) {
     const b = (body ?? {}) as { error?: string; details?: ApiError["details"] };
+    // The login expired (password protection): go to the login page, then come back here.
+    if (res.status === 401 && b.details?.code === "login" && typeof window !== "undefined") {
+      // A full page load (not client navigation), so nothing of the expired session stays in memory.
+      const login = new URL("/login", window.location.origin);
+      login.searchParams.set("next", window.location.pathname + window.location.search);
+      window.location.assign(login.href);
+    }
     throw new ApiError(b.error ? msg(b.error) : tr("Request failed ({status})", { status: res.status }), res.status, b.details);
   }
   return body as T;

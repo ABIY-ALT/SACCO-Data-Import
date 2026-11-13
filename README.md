@@ -107,7 +107,8 @@ changes; without `BLOB_READ_WRITE_TOKEN` the app keeps using the local `storage`
 `vercel.json` runs the functions in Frankfurt (`fra1`), close to the database. `.vercelignore` keeps `storage/`, `test-data/` and
 `.env*` files out of the upload. Heavy API routes allow up to 300 seconds (`maxDuration`); lower it if your plan allows less.
 
-⚠ The app has **no login**. On Vercel it is reachable from the internet — do not share the link until a password is added.
+**Password:** add `APP_PASSWORD` to the project's Environment Variables (and redeploy) to require a login for every page and
+API. Without it the app is open to anyone who has the link.
 
 ## Language (Amharic / English)
 
@@ -120,7 +121,12 @@ All Amharic texts are in `src/lib/i18n/am.ts`, keyed by the English text in the 
 
 ## Notes and limits
 
-- There is **no login**. Run it on an internal network or behind your existing authentication/reverse proxy.
+- Login is a single shared password (`APP_PASSWORD`); there are no separate user accounts or roles.
+- Dates in the Ethiopian calendar (ዓ.ም) are converted to Gregorian: automatically when a value says ዓ.ም or names an Ethiopian
+  month, or for a whole column when its Calendar rule is set to Ethiopian.
+- New members (not in a template that lists the members) are not added: register them in the SACCO system first and download a
+  new template. Their rows are listed in the invalid-records file.
+- One sheet of the original file per import.
 - Phone validation uses the country code and number length from Settings (default Ethiopia, +251, 9 digits after the 0).
-- Dates are converted from the Gregorian calendar only (no Ethiopian-calendar conversion).
-- Multi-row headers and merged header cells are not supported; choose the single header row on the upload step.
+- Column headers on two rows (a merged title over sub-titles) are combined when “The column headers use 2 rows” is ticked for the
+  original file. The template must have its headers on one row.

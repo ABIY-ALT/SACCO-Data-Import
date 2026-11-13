@@ -409,6 +409,7 @@ const EVENT_LABEL: Record<string, string> = {
   cell_edited: tk("Value corrected"),
   cell_reverted: tk("Correction undone"),
   cell_source_changed: tk("Value source chosen"),
+  bulk_fix: tk("Many rows changed at once"),
   row_excluded: tk("Record excluded"),
   row_included: tk("Record included again"),
   generated: tk("Final file generated and verified"),
@@ -455,6 +456,10 @@ function describe(e: ImportEvent, t: T): string {
       );
     case "files_purged":
       return d.reason === "retention" ? t("By the retention policy") : t("By a user");
+    case "bulk_fix":
+      return [t("{n} rows", { n: Number(d.rows) }), d.column ? s(d.column) : "", d.problem ? t.msg(s(d.problem)) : "", d.find !== null && d.find !== undefined ? `“${s(d.find)}” → “${s(d.value)}”` : d.value ? `→ “${s(d.value)}”` : ""]
+        .filter(Boolean)
+        .join(" · ");
     default:
       return "";
   }

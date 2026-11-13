@@ -116,7 +116,11 @@ export function parseWorkbook(buf: Buffer, ext: "xlsx" | "xls" | "csv", opts: { 
     let end = rows.length;
     while (end > 0 && rows[end - 1].length === 0) end--;
     rows.length = end;
-    sheets.push({ name, rows });
+    // Cells merged across columns near the top (titles over sub-titles), for headers on two rows.
+    const merges = ((ws?.["!merges"] ?? []) as XLSX.Range[])
+      .filter((m) => m.s.r < 50 && m.e.c > m.s.c)
+      .map((m) => ({ r: m.s.r, r2: m.e.r, c1: m.s.c, c2: m.e.c }));
+    sheets.push(merges.length ? { name, rows, merges } : { name, rows });
     if (opts.template) formats[name] = fmts;
   }
   const lists = opts.template && ext === "xlsx" ? safeExtractLists(buf, wb, sheets) : {};

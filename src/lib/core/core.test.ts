@@ -366,6 +366,66 @@ describe("changes to the template's own values", () => {
   });
 });
 
+describe("combining several original columns", () => {
+  const template = sheet([["Member ID", "Full Name", "Total Savings"]]);
+  const source = sheet([
+    ["ID", "Name", "Father Name", "Savings", "Voluntary"],
+    ["001", "Abebe", "Kebede", "1,500.00", { n: 200, w: "200" }],
+    ["002", "Sara", "", { n: 0.1, w: "0.1" }, { n: 0.2, w: "0.2" }],
+    ["003", "Hana", "Girma", "abc", { n: 5, w: "5" }],
+  ]);
+  const { targets } = buildTargets(template, 1, { lists: {}, numFmts: {} }, S);
+  const { sources } = buildSources(source, 1, S);
+  const base = suggestMappings(targets, sources, source, 1, S, []).map((m) => ({ ...m, confirmed: true }));
+  const mappings = base.map((m) =>
+    m.target === 1
+      ? { ...m, source: 1, combine: { op: "join" as const, sources: [1, 2], separator: " " } }
+      : m.target === 2
+        ? { ...m, source: 3, rule: { ...m.rule, type: "amount" as const }, combine: { op: "sum" as const, sources: [3, 4], separator: " " } }
+        : m,
+  );
+  const config: ImportConfig = { mappings, transforms: { ...DEFAULT_TRANSFORMS }, edits: {}, excluded: [], appliedMappingTemplateId: null, mode: "rows", fill: null, memberOverrides: {}, approvals: { month: false } };
+  const res = runPipeline({ targets, sources, sheet: source, headerRow: 1, config, settings: S, today: new Date(2026, 10, 13) });
+
+  it("joins texts and leaves out empty parts", () => {
+    expect(res.rows[0].values[1]).toBe("Abebe Kebede");
+    expect(res.rows[1].values[1]).toBe("Sara");
+  });
+  it("adds numbers exactly, without floating-point noise", () => {
+    expect(res.rows[0].values[2]).toBe(1700);
+    expect(res.rows[1].values[2]).toBe(0.3);
+    expect(res.rows[1].issues).toEqual([]);
+  });
+  it("reports a part that is not a number instead of guessing", () => {
+    expect(res.rows[2].issues.map((i) => i.code)).toContain("number");
+    expect(res.rows[2].status).toBe("error");
+  });
+  it("shows each part as the original value", () => {
+    expect(toApiRow(res.rows[0], targets, config, source, 1).original).toEqual(["001", "Abebe Kebede", "1,500.00 + 200"]);
+  });
+});
+
+describe("column headers on two rows", () => {
+  const rows: RawCell[][] = [
+    ["ተ.ቁ", "ስም", "Regular loan", null, "Savings", null],
+    [null, null, "Principal", "Interest", null, "Phone"],
+    ["1", "Abebe", { n: 100, w: "100" }, { n: 5, w: "5" }, { n: 50, w: "50" }, "0911"],
+  ];
+  it("combines a title with its sub-titles using Excel's merged cells", async () => {
+    const { mergeHeaderRows } = await import("./analyze");
+    // "Regular loan" is merged over C:D; "Savings" (E) is not merged with F.
+    const merged = mergeHeaderRows({ name: "S", rows, merges: [{ r: 0, r2: 0, c1: 2, c2: 3 }] }, 2);
+    expect(merged.rows[1]).toEqual(["ተ.ቁ", "ስም", "Regular loan Principal", "Regular loan Interest", "Savings", "Phone"]);
+    expect(merged.rows[2]).toBe(rows[2]); // data rows are untouched
+    expect(rows[1][2]).toBe("Principal"); // the original sheet is not changed
+  });
+  it("without merge information, a blank title cell takes the title on its left", async () => {
+    const { mergeHeaderRows } = await import("./analyze");
+    const merged = mergeHeaderRows({ name: "S", rows }, 2);
+    expect(merged.rows[1].slice(0, 5)).toEqual(["ተ.ቁ", "ስም", "Regular loan Principal", "Regular loan Interest", "Savings"]);
+  });
+});
+
 describe("decimal places", () => {
   it("ignores floating-point noise but catches real extra decimals", async () => {
     const { decimalPlaces } = await import("./values");
