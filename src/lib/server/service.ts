@@ -269,6 +269,16 @@ function mappingEntriesFromConfig(targets: TargetColumn[], sources: SourceColumn
       defaultValue: m.defaultValue,
       fillBlanks: m.fillBlanks,
       ...(m.useTemplate ? { useTemplate: true } : {}),
+      ...(m.combine
+        ? {
+            combine: {
+              op: m.combine.op,
+              separator: m.combine.separator,
+              sourceHeaders: m.combine.sources.map((i) => headerKey(sources[i].header)),
+              sourceLabels: m.combine.sources.map((i) => sources[i].label),
+            },
+          }
+        : {}),
       rule: m.rule,
     };
   });
@@ -527,7 +537,15 @@ function sanitizeConfig(input: unknown, imp: FullImport): ImportConfig {
   if (!Array.isArray(raw.mappings) || raw.mappings.length !== a.targets.length) throw new HttpError(400, "Invalid mapping configuration.");
   const mappings: ColumnMapping[] = a.targets.map((t, k) => {
     const m = (raw.mappings as ColumnMapping[]).find((x) => x && x.target === t.index) ?? prev.mappings[k];
-    const source = m.source === null || m.source === undefined ? null : Number(m.source);
+    // Combined columns: 2–10 existing original columns; the first one is the mapping's source.
+    const cb = m.combine;
+    const combineSources =
+      cb && Array.isArray(cb.sources) ? [...new Set(cb.sources.map(Number))].filter((x) => Number.isInteger(x) && a.sources[x]).slice(0, 10) : [];
+    const combine =
+      combineSources.length >= 2
+        ? { op: cb!.op === "sum" ? ("sum" as const) : ("join" as const), sources: combineSources, separator: String(cb!.separator ?? " ").slice(0, 5) }
+        : undefined;
+    const source = combine ? combine.sources[0] : m.source === null || m.source === undefined ? null : Number(m.source);
     if (source !== null && (!Number.isInteger(source) || !a.sources[source])) throw new HttpError(400, `Invalid source column for "${t.label}".`);
     const r = (m.rule ?? prev.mappings[k].rule) as ColumnRule;
     const rule: ColumnRule = {
@@ -538,6 +556,7 @@ function sanitizeConfig(input: unknown, imp: FullImport): ImportConfig {
       dateFormat: String(r.dateFormat || "DD/MM/YYYY").toUpperCase().slice(0, 20),
       dateOutput: r.dateOutput === "text" ? "text" : "date",
       dateOrder: ["auto", "DMY", "MDY", "YMD"].includes(r.dateOrder) ? r.dateOrder : "auto",
+      calendar: r.calendar === "ethiopian" || r.calendar === "gregorian" ? r.calendar : "auto",
       phoneFormat: ["local", "international", "international_no_plus", "keep"].includes(r.phoneFormat) ? r.phoneFormat : "local",
       allowedValues: Array.isArray(r.allowedValues) ? r.allowedValues.map(String).filter((x) => x.trim() !== "").slice(0, 200) : [],
       valueMap: Object.fromEntries(Object.entries(r.valueMap ?? {}).slice(0, 500).map(([kk, v]) => [String(kk).toLowerCase(), String(v)])),
@@ -554,6 +573,7 @@ function sanitizeConfig(input: unknown, imp: FullImport): ImportConfig {
       fillBlanks: Boolean(m.fillBlanks),
       defaultApproved: Boolean(m.defaultApproved),
       ...(m.useTemplate ? { useTemplate: true } : {}),
+      ...(combine ? { combine } : {}),
       rule,
     };
   });
@@ -583,8 +603,10 @@ function sanitizeConfig(input: unknown, imp: FullImport): ImportConfig {
   if (fill) {
     // ID and name always come from the member list, never from an original column.
     for (const m of mappings)
-      if (m.target === fill.keyTarget || m.target === fill.nameTarget)
+      if (m.target === fill.keyTarget || m.target === fill.nameTarget) {
         Object.assign(m, { source: null, status: "missing", confirmed: true, reason: "Taken from the template's member list", warnings: [] });
+        delete m.combine;
+      }
   }
   return {
     mappings,

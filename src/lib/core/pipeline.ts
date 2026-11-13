@@ -46,6 +46,7 @@ import {
   phoneInFormat,
   toISO,
 } from "./values";
+import { currentEthiopianYear, looksEthiopian, parseEthiopianDate } from "./ethiopian-date";
 
 export const TRANSFORM_TAG_LABELS: Record<string, string> = {
   trim: "Removed extra spaces",
@@ -56,6 +57,7 @@ export const TRANSFORM_TAG_LABELS: Record<string, string> = {
   case: "Changed capitalization",
   default: "Filled with default value",
   edit: "Corrected by user",
+  calendar: "Converted from the Ethiopian calendar",
 };
 
 /** Internal processed row (compact). */
@@ -152,7 +154,7 @@ function processCell(
   c: ColCtx,
   cfg: ImportConfig,
   settings: AppSettings,
-  today: { y: number; iso: string },
+  today: { y: number; iso: string; ecY: number },
 ): CellResult {
   const tr = cfg.transforms;
   const rule = c.m.rule;
@@ -234,8 +236,21 @@ function processCell(
     }
     case "date": {
       const isRealDate = input !== null && typeof input !== "string" && Boolean(input.d);
+      // Ethiopian calendar (ዓ.ም): the column says so, or (automatic) the value says ዓ.ም / names an Ethiopian month.
+      // The date is converted to the same day in the Gregorian calendar, which the template expects.
+      const calendar = rule.calendar ?? "auto";
+      const ethiopian =
+        !fromEdit && !fromDefault && (calendar === "ethiopian" || (calendar === "auto" && typeof input === "string" && looksEthiopian(input)));
       let iso: string | null = null;
-      if (isRealDate) {
+      if (ethiopian) {
+        const p = parseEthiopianDate(input, rule.dateOrder === "auto" ? "DMY" : rule.dateOrder, today.ecY);
+        if (!p.ok) {
+          err("date", p.reason);
+          return { value: rawToText(input), tag, issues };
+        }
+        iso = toISO(p.date);
+        setTag("calendar");
+      } else if (isRealDate) {
         iso = (input as { d: string }).d;
       } else if (tr.dates || fromEdit || fromDefault) {
         // Values typed by the user (corrections, defaults) are read in the template's own format.
@@ -260,7 +275,7 @@ function processCell(
         }
         iso = toISO(p.date);
       }
-      if (isRealDate && rule.dateOutput === "text" && !fromEdit) {
+      if (isRealDate && !ethiopian && rule.dateOutput === "text" && !fromEdit) {
         const txt = formatDate(fromISO(iso), rule.dateFormat);
         if (txt !== rawToText(input).trim()) {
           if (tr.dates) setTag("date");
@@ -361,6 +376,40 @@ export interface PipelineInput {
 
 const ACCEPTED: ReadonlySet<MemberMatchStatus> = new Set(["id", "exact", "remembered", "confirmed", "manual"]);
 
+/** Original columns a template column reads from (several when columns are combined). */
+export function sourceColumnsOf(m: ColumnMapping): number[] {
+  if (m.source === null) return [];
+  return m.combine && m.combine.sources.length > 1 ? m.combine.sources : [m.source];
+}
+
+/**
+ * The original value of a template column in one row. Combined columns: texts joined with the separator, or numbers added up
+ * (an entry that is not a number is returned as it is, so it is reported as an invalid number).
+ */
+export function readSource(src: RawCell[] | undefined, m: ColumnMapping): RawCell {
+  if (m.source === null) return null;
+  if (!m.combine || m.combine.sources.length < 2) return src?.[m.source] ?? null;
+  const cells = m.combine.sources.map((c) => src?.[c] ?? null).filter((c) => !isBlank(c));
+  if (cells.length === 0) return null;
+  if (m.combine.op === "join") return cells.map((c) => rawToText(c).trim()).join(m.combine.separator);
+  let total = 0;
+  for (const c of cells) {
+    const p = parseNumber(c, true);
+    if (!p.ok) return rawToText(c);
+    total += p.value;
+  }
+  total = Math.round(total * 1e10) / 1e10; // no floating-point noise such as 0.30000000000000004
+  return { n: total, w: formatNumber(total) };
+}
+
+/** The original value as shown to the user: combined columns show each part ("1,500 + 200"). */
+export function originalText(src: RawCell[] | undefined, m: ColumnMapping): string {
+  if (m.source === null) return "";
+  if (!m.combine || m.combine.sources.length < 2) return rawToText(src?.[m.source] ?? null);
+  const parts = m.combine.sources.map((c) => rawToText(src?.[c] ?? null).trim()).filter(Boolean);
+  return parts.join(m.combine.op === "sum" ? " + " : m.combine.separator);
+}
+
 /** Template cell → output value, unchanged. */
 export function rawToOut(cell: RawCell): OutValue {
   if (cell === null) return null;
@@ -376,6 +425,7 @@ export function runPipeline(input: PipelineInput): PipelineResult {
   const today = {
     y: now.getFullYear(),
     iso: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`,
+    ecY: currentEthiopianYear(now),
   };
   const mappingByTarget = new Map(config.mappings.map((m) => [m.target, m]));
   const ctxs: ColCtx[] = targets.map((t) => buildCtx(t, mappingByTarget.get(t.index)!, sheet, headerRow, settings));
@@ -397,7 +447,7 @@ export function runPipeline(input: PipelineInput): PipelineResult {
   // ---- which rows are real data (blank rows, repeated headers/titles, ድምር/total rows and empty rows are skipped)
   const titleRows = sheet.rows.slice(0, headerRow - 1);
   const usedCols = new Set<number>();
-  for (const m of config.mappings) if (m.source !== null) usedCols.add(m.source);
+  for (const m of config.mappings) for (const c of sourceColumnsOf(m)) usedCols.add(c);
   if (fill?.sourceNameCol != null) usedCols.add(fill.sourceNameCol);
   if (fill?.sourceKeyCol != null) usedCols.add(fill.sourceKeyCol);
   const dataRowsIdx: number[] = [];
@@ -440,7 +490,7 @@ export function runPipeline(input: PipelineInput): PipelineResult {
   const components = totalCol !== null ? totalComponents(sources, totalCol, moneyCols) : [];
   const mappedSources = new Map<number, number>(); // source column -> output position k
   ctxs.forEach((c, k) => {
-    if (c.m.source !== null && k !== keyK && k !== nameK) mappedSources.set(c.m.source, k);
+    if (k !== keyK && k !== nameK) for (const sc of sourceColumnsOf(c.m)) mappedSources.set(sc, k);
   });
 
   for (const r of dataRowsIdx) {
@@ -475,12 +525,12 @@ export function runPipeline(input: PipelineInput): PipelineResult {
         if (choice === "template" || (choice !== "original" && m.useTemplate)) {
           // You chose the template's value (for this cell or the whole column): the original file's value is not used.
           values[k] = tpl[k];
-          if (m.source !== null && !isBlank(src?.[m.source] ?? null)) (tplChange ??= {})[k] = "chosen";
+          if (!isBlank(readSource(src, m))) (tplChange ??= {})[k] = "chosen";
           else if (!outBlank(tpl[k])) (tplChange ??= {})[k] = "kept";
           continue;
         }
       }
-      let cell: RawCell = m.source === null ? null : (src?.[m.source] ?? null);
+      let cell: RawCell = readSource(src, m);
       let fromEdit = false;
       let fromDefault = false;
       if (edit !== undefined) {
@@ -831,7 +881,7 @@ function summarizeTemplate(
       const list = a.samples.get(c.t.index) ?? [];
       if (list.length < TEMPLATE_SAMPLES) {
         const original =
-          k === nameK ? (row.member?.sourceName ?? "") : k === keyK ? (row.member?.sourceKey ?? "") : c.m.source === null ? "" : rawToText(src?.[c.m.source] ?? null);
+          k === nameK ? (row.member?.sourceName ?? "") : k === keyK ? (row.member?.sourceKey ?? "") : originalText(src, c.m);
         list.push({
           row: input.headerRow + 1 + row.i,
           target: c.t.index,
@@ -884,6 +934,8 @@ function reconcile(
 ): Reconciliation | null {
   const { sheet, headerRow, sources, targets } = input;
   const cols = moneyCols.filter((c) => c !== totalCol);
+  // Template columns that add up several original columns: each original column counts its own part.
+  const sumKs = new Set(targets.map((t, k) => (input.config.mappings.find((m) => m.target === t.index)?.combine?.op === "sum" ? k : -1)).filter((k) => k >= 0));
   if (cols.length === 0 && totalCol === null) return null;
   const num = (r: number, c: number) => numberOf(sheet.rows[r]?.[c] ?? null) ?? 0;
   const rowByI = new Map(rows.map((r) => [r.i, r]));
@@ -901,7 +953,7 @@ function reconcile(
         const row = rowByI.get(r - headerRow)!;
         if (row.tplChange?.[k] === "chosen") continue; // the template's value was used instead — not money from the original file
         const v = row.values[k];
-        if (typeof v === "number") importedTotal += v;
+        if (typeof v === "number") importedTotal += sumKs.has(k) ? num(r, c) : v;
       }
     }
     return {
@@ -1014,7 +1066,7 @@ export function toApiRow(row: PRow, targets: TargetColumn[], config: ImportConfi
       if (fill && t.index === fill.keyTarget) return row.member?.sourceKey ?? "";
       if (fill && t.index === fill.nameTarget) return row.member?.sourceName ?? "";
       const m = mappingByTarget.get(t.index)!;
-      return m.source === null ? "" : rawToText(src?.[m.source] ?? null);
+      return originalText(src, m);
     }),
     template: row.tpl ? targets.map((t, k) => displayValue(row.tpl![k], mappingByTarget.get(t.index)!.rule.dateFormat)) : null,
     templateRow: row.tplExcelRow ?? null,

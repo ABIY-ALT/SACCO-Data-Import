@@ -22,6 +22,7 @@ const TAG_LABEL: Record<string, string> = {
   case: tk("Capitalization"),
   default: tk("Default value"),
   edit: tk("Corrected by you"),
+  calendar: tk("Ethiopian date converted"),
 };
 
 export function SummaryStats({ s }: { s: ProcessSummary }) {

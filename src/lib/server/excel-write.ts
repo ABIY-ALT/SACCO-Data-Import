@@ -13,7 +13,7 @@ import type {
 import { COLUMN_TYPE_LABELS, MEMBER_STATUS_LABELS, TEMPLATE_CHANGE_LABELS, TRANSFORM_INFO } from "../types";
 import type { SheetData } from "../core/analyze";
 import type { OutputRow, PipelineResult } from "../core/pipeline";
-import { TRANSFORM_TAG_LABELS, displayValue, issueLabel } from "../core/pipeline";
+import { TRANSFORM_TAG_LABELS, displayValue, issueLabel, originalText, sourceColumnsOf } from "../core/pipeline";
 import { colLetter, rawToText } from "../core/text";
 import { formatDate, fromISO, patternToExcelFormat } from "../core/values";
 import { clampValidations, readForVerification, XLSX } from "./excel-read";
@@ -233,6 +233,7 @@ export async function writeInvalidXlsx(ctx: OutputContext): Promise<{ buffer: Bu
   const bad = ctx.result.rows.filter((r) => r.status === "error" || r.status === "excluded");
   const headerRow = ctx.source.headerRow;
   const targetToSource = new Map(ctx.config.mappings.map((m) => [m.target, m.source]));
+  const targetToSources = new Map(ctx.config.mappings.map((m) => [m.target, sourceColumnsOf(m)]));
   const fill = ctx.config.mode === "fill" ? ctx.config.fill : null;
   const firstSourceCol = fill ? 6 : 4;
   // Only original columns with a header or data are copied, and never more than Excel allows. A single stray value far to the
@@ -267,7 +268,7 @@ export async function writeInvalidXlsx(ctx: OutputContext): Promise<{ buffer: Bu
       }
       for (const s of sourceCols) values.push(rawToText(src[s.index] ?? null));
       const r = ws.addRow(values);
-      const badSources = new Set(row.issues.filter((x) => x.level === "error" && x.col >= 0).map((x) => targetToSource.get(x.col)));
+      const badSources = new Set(row.issues.filter((x) => x.level === "error" && x.col >= 0).flatMap((x) => targetToSources.get(x.col) ?? []));
       sourceCols.forEach((s, idx) => {
         const cell = r.getCell(firstSourceCol + idx);
         cell.numFmt = "@";
@@ -534,9 +535,7 @@ export async function writeReportXlsx(ctx: OutputContext, verification: Verifica
             ? (row.member?.sourceName ?? "")
             : fill && t.index === fill.keyTarget
               ? (row.member?.sourceKey ?? "")
-              : m.source === null
-                ? ""
-                : rawToText(src[m.source] ?? null);
+              : originalText(src, m);
         const change = [tag ? tr(TRANSFORM_TAG_LABELS[tag] ?? tag) : "", tplTag ? tr(TEMPLATE_CHANGE_LABELS[tplTag]) : ""].filter(Boolean).join("; ");
         const inTemplate = row.tpl ? displayValue(row.tpl[k], m.rule.dateFormat) : "";
         const r = log.addRow([headerRow + 1 + row.i, t.label, change, before, inTemplate, displayValue(row.values[k], m.rule.dateFormat)]);
@@ -610,7 +609,11 @@ export async function writeMappingXlsx(ctx: OutputContext): Promise<Buffer> {
         tr(COLUMN_TYPE_LABELS[m.rule.type]),
         m.rule.required ? yes : no,
         m.rule.unique ? yes : no,
-        s && !m.useTemplate ? `${s.letter}: ${s.label}` : "—",
+        m.combine && !m.useTemplate
+          ? m.combine.sources.map((i) => `${ctx.sources[i].letter}: ${ctx.sources[i].label}`).join(m.combine.op === "sum" ? " + " : " & ")
+          : s && !m.useTemplate
+            ? `${s.letter}: ${s.label}`
+            : "—",
         memberCol || (fill && m.useTemplate) ? tr("From the template") : tr(STATUS_LABEL[m.status] ?? m.status),
         m.status === "possible" ? (m.confirmed ? yes : no) : "—",
         m.defaultValue ? `${m.defaultValue}${m.source !== null && m.fillBlanks ? ` ${tr("(for blank cells)")}` : ""}` : "",

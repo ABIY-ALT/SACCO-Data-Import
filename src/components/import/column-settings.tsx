@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { ColumnMapping, ColumnRule, ColumnType, TargetColumn } from "@/lib/types";
+import type { ColumnCombine, ColumnMapping, ColumnRule, ColumnType, SourceColumn, TargetColumn } from "@/lib/types";
 import { COLUMN_TYPE_LABELS } from "@/lib/types";
 import { useApi } from "@/lib/client/api";
 import { useT } from "@/components/i18n";
@@ -26,6 +26,8 @@ function Inner({ onClose, ctx, col }: { onClose: () => void; ctx: CompareContext
   const source = m.source !== null ? analysis.sources[m.source] : null;
   const evidence = analysis.dateOrderDetected[col.index];
   const [allowedText, setAllowedText] = useState(rule.allowedValues.join(", "));
+  // Fill mode: member ID and name always come from the template's member list.
+  const locked = config.mode === "fill" && (col.index === config.fill?.keyTarget || col.index === config.fill?.nameTarget);
 
   return (
     <Drawer open onClose={onClose} title={col.label} subtitle={t("Template column {c} · rules for the final file", { c: col.letter })}>
@@ -80,6 +82,22 @@ function Inner({ onClose, ctx, col }: { onClose: () => void; ctx: CompareContext
                   <option key={f} value={f} />
                 ))}
               </datalist>
+            </Field>
+            <Field
+              label={t("Calendar of the dates in the original file")}
+              hint={
+                (rule.calendar ?? "auto") === "auto"
+                  ? t("Automatic: a date is read as Ethiopian when it says ዓ.ም or names an Ethiopian month (e.g. ሰኔ 12 2016). Choose Ethiopian if the dates are written only with numbers.")
+                  : rule.calendar === "ethiopian"
+                    ? t("Every date is read as an Ethiopian date (day/month/year) and written in the Gregorian calendar, e.g. 1/1/2016 ዓ.ም → 12/09/2023.")
+                    : undefined
+              }
+            >
+              <select className={inputCls} value={rule.calendar ?? "auto"} onChange={(e) => setRule({ calendar: e.target.value as ColumnRule["calendar"] })}>
+                <option value="auto">{t("Automatic")}</option>
+                <option value="gregorian">{t("Gregorian (European)")}</option>
+                <option value="ethiopian">{t("Ethiopian (ዓ.ም)")}</option>
+              </select>
             </Field>
             <Field label={t("Write dates as")}>
               <select className={inputCls} value={rule.dateOutput} onChange={(e) => setRule({ dateOutput: e.target.value as "date" | "text" })}>
@@ -148,6 +166,8 @@ function Inner({ onClose, ctx, col }: { onClose: () => void; ctx: CompareContext
           </section>
         )}
 
+        {!locked && <CombineEditor key={col.index} m={m} sources={analysis.sources} onChange={setMapping} />}
+
         <section className="space-y-3">
           <h3 className="text-sm font-semibold text-slate-900">{t("Default value")}</h3>
           <Field
@@ -175,6 +195,85 @@ function Inner({ onClose, ctx, col }: { onClose: () => void; ctx: CompareContext
         </section>
       </div>
     </Drawer>
+  );
+}
+
+/** Fill one template column from several original columns: join their texts, or add their numbers. */
+function CombineEditor({ m, sources, onChange }: { m: ColumnMapping; sources: SourceColumn[]; onChange: (patch: Partial<ColumnMapping>) => void }) {
+  const t = useT();
+  const usable = sources.filter((s) => !(s.blankHeader && s.empty));
+  const [on, setOn] = useState(Boolean(m.combine));
+  const [draft, setDraft] = useState<ColumnCombine>(m.combine ?? { op: "join", sources: m.source !== null ? [m.source] : [], separator: " " });
+
+  // Only a complete choice (2 or more columns) is saved; until then the column keeps its current mapping.
+  function apply(next: ColumnCombine) {
+    setDraft(next);
+    if (next.sources.length >= 2)
+      onChange({ combine: next, source: next.sources[0], status: "manual", confirmed: true, reason: "Chosen by you", warnings: [], useTemplate: false });
+  }
+  function toggle(v: boolean) {
+    setOn(v);
+    if (v) apply(draft);
+    else if (m.combine) onChange({ combine: undefined });
+  }
+  const pick = (index: number) =>
+    apply({ ...draft, sources: draft.sources.includes(index) ? draft.sources.filter((x) => x !== index) : [...draft.sources, index] });
+  const joiner = draft.op === "sum" ? " + " : ` ${draft.separator.trim() || "␣"} `;
+
+  return (
+    <section className="space-y-3">
+      <h3 className="text-sm font-semibold text-slate-900">{t("Combine several original columns")}</h3>
+      <Toggle
+        checked={on}
+        onChange={toggle}
+        label={t("Fill this column from several original columns")}
+        description={t("For example Full Name = Name + Father's name, or Total = Savings + Interest.")}
+      />
+      {on && (
+        <div className="space-y-3 rounded-lg border border-slate-200 p-3">
+          <div className="flex flex-wrap gap-4 text-sm">
+            {(["join", "sum"] as const).map((op) => (
+              <label key={op} className="flex cursor-pointer items-center gap-2">
+                <input type="radio" name="combine-op" checked={draft.op === op} onChange={() => apply({ ...draft, op })} className="accent-brand-600" />
+                {op === "join" ? t("Join the texts") : t("Add the numbers")}
+              </label>
+            ))}
+          </div>
+          {draft.op === "join" && (
+            <Field label={t("Put between the texts")} hint={t("A space by default. For example a space, a comma or a dash.")}>
+              <input className={inputClass({ w: "w-24" })} value={draft.separator} maxLength={5} onChange={(e) => apply({ ...draft, separator: e.target.value })} />
+            </Field>
+          )}
+          <div>
+            <div className="mb-1.5 text-sm font-medium text-slate-700">{t("Columns, in order (click to add or remove):")}</div>
+            <div className="scroll-thin flex max-h-48 flex-wrap gap-1.5 overflow-y-auto">
+              {usable.map((s) => {
+                const pos = draft.sources.indexOf(s.index);
+                return (
+                  <button
+                    key={s.index}
+                    type="button"
+                    aria-pressed={pos >= 0}
+                    onClick={() => pick(s.index)}
+                    className={`inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs ${
+                      pos >= 0 ? "border-brand-500 bg-brand-50 text-brand-900" : "border-slate-200 text-slate-700 hover:bg-slate-50"
+                    }`}
+                  >
+                    {pos >= 0 && <span className="flex h-4 w-4 items-center justify-center rounded-full bg-brand-600 text-[10px] font-semibold text-white">{pos + 1}</span>}
+                    {s.letter}: {s.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+          <p className={`text-xs ${draft.sources.length < 2 ? "text-amber-700" : "text-slate-600"}`}>
+            {draft.sources.length < 2
+              ? t("Choose at least 2 columns.")
+              : t("Result: {formula}", { formula: draft.sources.map((i) => sources[i]?.label ?? "").join(joiner) })}
+          </p>
+        </div>
+      )}
+    </section>
   );
 }
 

@@ -27,7 +27,7 @@ export function CleaningStep({ ctx }: { ctx: CompareContext }) {
   const targets = detail.import.analysis!.targets;
   const stat = (tag: string) => summary.transforms.find((x) => x.key === tag);
   const keys = Object.keys(TRANSFORM_INFO) as (keyof TransformOptions)[];
-  const extraStats = ["default", "edit"].map((k) => stat(k)).filter(Boolean) as TransformStat[];
+  const extraStats = ["calendar", "default", "edit"].map((k) => stat(k)).filter(Boolean) as TransformStat[];
   const cells = (n: number) => (n === 1 ? t("{n} cell", { n }) : t("{n} cells", { n }));
 
   return (
@@ -78,7 +78,11 @@ export function CleaningStep({ ctx }: { ctx: CompareContext }) {
                 <Badge tone="violet">{cells(s.cells)}</Badge>
               </div>
               <p className="mt-1 text-sm text-slate-500">
-                {s.key === "default" ? t("Change or remove default values on the Column mapping step.") : t("Undo corrections in the row inspector on the Validation step.")}
+                {s.key === "calendar"
+                  ? t("Change the calendar in the column rules (⚙) on the Column mapping step.")
+                  : s.key === "default"
+                    ? t("Change or remove default values on the Column mapping step.")
+                    : t("Undo corrections in the row inspector on the Validation step.")}
               </p>
               <Samples stat={s} targets={targets} />
             </Card>

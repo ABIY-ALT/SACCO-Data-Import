@@ -121,6 +121,14 @@ export function MappingStep({ ctx, onReanalyze }: { ctx: CompareContext; onReana
             {analysis.savedMappingNotFound.length > 0 && <> {t("These saved columns were not found in this file: {list}.", { list: analysis.savedMappingNotFound.join(", ") })}</>}
           </Alert>
         )}
+        {analysis.months.source?.ecMonth && config.mappings.some((m) => m.rule.type === "date" && m.source !== null && (m.rule.calendar ?? "auto") === "auto") && (
+          <Alert tone="info">
+            {t(
+              "This file uses the Ethiopian calendar ({month}). If its date columns are Ethiopian dates written only with numbers, open the column rules (⚙) and set Calendar to Ethiopian.",
+              { month: analysis.months.source.label },
+            )}
+          </Alert>
+        )}
         {analysis.orderDiffers && (
           <Alert tone="info">{t("The original file has its columns in a different order. The final file will follow the template order exactly.")}</Alert>
         )}

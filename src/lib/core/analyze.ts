@@ -465,6 +465,26 @@ export function applySavedMapping(
       defaultApproved: false,
       ...(e.useTemplate ? { useTemplate: true } : {}),
     };
+    delete next.combine;
+    if (e.combine && e.combine.sourceHeaders.length >= 2) {
+      // Combined columns: every one of them must be in this file.
+      const cols = e.combine.sourceHeaders.map((h) => sourceByKey.get(h));
+      if (!cols.every(Boolean)) {
+        notFound.push(...e.combine.sourceLabels.filter((_, i) => !cols[i]));
+        return next;
+      }
+      const idx = cols.map((c) => c!.index);
+      Object.assign(next, {
+        source: idx[0],
+        combine: { op: e.combine.op, separator: e.combine.separator, sources: idx },
+        status: "learned",
+        confirmed: true,
+        reason: "From your saved mapping",
+        warnings: [],
+      });
+      fromSaved.add(m.target);
+      return next;
+    }
     if (e.sourceHeader === null) {
       next.source = null;
       next.status = "missing";
@@ -487,7 +507,7 @@ export function applySavedMapping(
     return next;
   });
   // A source column may now be used twice (saved mapping + suggestion); drop the automatic suggestion.
-  const savedSources = new Set(mappings.filter((m) => fromSaved.has(m.target)).map((m) => m.source));
+  const savedSources = new Set(mappings.filter((m) => fromSaved.has(m.target)).flatMap((m) => (m.combine ? m.combine.sources : [m.source])));
   for (const m of mappings) {
     if (!fromSaved.has(m.target) && m.source !== null && savedSources.has(m.source) && m.status !== "exact") {
       m.source = null;

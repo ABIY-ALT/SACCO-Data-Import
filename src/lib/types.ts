@@ -115,6 +115,7 @@ export type MatchStatus =
 
 export type PhoneFormat = "local" | "international" | "international_no_plus" | "keep";
 export type DateOrder = "auto" | "DMY" | "MDY" | "YMD";
+export type DateCalendar = "auto" | "gregorian" | "ethiopian";
 
 export interface ColumnRule {
   type: ColumnType;
@@ -124,6 +125,8 @@ export interface ColumnRule {
   dateFormat: string; // output format, e.g. DD/MM/YYYY
   dateOutput: "date" | "text";
   dateOrder: DateOrder; // how to read ambiguous source dates
+  /** Calendar of the dates in the original file. "auto": Ethiopian when a value says ዓ.ም or names an Ethiopian month. */
+  calendar?: DateCalendar;
   phoneFormat: PhoneFormat;
   allowedValues: string[];
   valueMap: Record<string, string>; // lower-cased source value -> output value
@@ -141,7 +144,16 @@ export interface ColumnMapping {
   defaultApproved: boolean; // explicit approval for defaults in money / ID columns
   /** Fill mode: take this column's values from the template, even where the original file has a value. */
   useTemplate?: boolean;
+  /** Several original columns combined into this template column ("source" is then the first of them). */
+  combine?: ColumnCombine;
   rule: ColumnRule;
+}
+
+/** Join the texts of several original columns (e.g. name + father's name), or add their numbers. */
+export interface ColumnCombine {
+  op: "join" | "sum";
+  sources: number[]; // original column indexes, in order
+  separator: string; // between joined texts
 }
 
 /** Where a value of the final file comes from, chosen per cell (fill mode). */
@@ -564,5 +576,6 @@ export interface SavedMappingEntry {
   defaultValue: string;
   fillBlanks: boolean;
   useTemplate?: boolean;
+  combine?: { op: "join" | "sum"; separator: string; sourceHeaders: string[]; sourceLabels: string[] };
   rule: ColumnRule;
 }

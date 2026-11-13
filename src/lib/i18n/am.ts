@@ -1109,5 +1109,20 @@ export const AM: Record<string, string> = {
   Values: "እሴቶች",
   "Sample values": "የናሙና እሴቶች",
 
+  // ———————————————————————————————————————————— Ethiopian calendar
+  "Calendar of the dates in the original file": "በኦሪጅናል ፋይሉ ውስጥ ያሉ ቀኖች የዘመን አቆጣጠር",
+  "Automatic: a date is read as Ethiopian when it says ዓ.ም or names an Ethiopian month (e.g. ሰኔ 12 2016). Choose Ethiopian if the dates are written only with numbers.":
+    "ራስ-ሰር፦ ቀኑ ዓ.ም ካለው ወይም የኢትዮጵያ ወር ስም ካለው (ለምሳሌ ሰኔ 12 2016) እንደ ኢትዮጵያ ቀን ይነበባል። ቀኖቹ በቁጥር ብቻ ከተጻፉ «የኢትዮጵያ» የሚለውን ይምረጡ።",
+  "Every date is read as an Ethiopian date (day/month/year) and written in the Gregorian calendar, e.g. 1/1/2016 ዓ.ም → 12/09/2023.":
+    "እያንዳንዱ ቀን እንደ ኢትዮጵያ ቀን (ቀን/ወር/ዓመት) ይነበብና በአውሮፓ አቆጣጠር ይጻፋል፤ ለምሳሌ 1/1/2016 ዓ.ም → 12/09/2023።",
+  "Gregorian (European)": "የአውሮፓ (ግሪጎሪያን)",
+  "Ethiopian (ዓ.ም)": "የኢትዮጵያ (ዓ.ም)",
+  "Converted from the Ethiopian calendar": "ከኢትዮጵያ ዘመን አቆጣጠር ተቀይሯል",
+  "Ethiopian date converted": "የኢትዮጵያ ቀን ተቀይሯል",
+  "Change the calendar in the column rules (⚙) on the Column mapping step.": "የዘመን አቆጣጠሩን በ«የአምዶች ማዛመጃ» ደረጃ በአምዱ ደንቦች (⚙) ውስጥ ይቀይሩ።",
+  '"{v}" is not a real Ethiopian calendar date': '"{v}" ትክክለኛ የኢትዮጵያ ዘመን አቆጣጠር ቀን አይደለም',
+  "This file uses the Ethiopian calendar ({month}). If its date columns are Ethiopian dates written only with numbers, open the column rules (⚙) and set Calendar to Ethiopian.":
+    "ይህ ፋይል የኢትዮጵያ ዘመን አቆጣጠር ይጠቀማል ({month})። የቀን አምዶቹ በቁጥር ብቻ የተጻፉ የኢትዮጵያ ቀኖች ከሆኑ የአምዱን ደንቦች (⚙) ከፍተው የዘመን አቆጣጠሩን «የኢትዮጵያ» ያድርጉት።",
+
   // —— end ——
 };
