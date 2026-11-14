@@ -5,7 +5,7 @@ import { del, get, list, put } from "@vercel/blob";
 
 // Where uploaded originals, parsed caches and generated files are kept:
 // - on your own computer/server: the folder STORAGE_DIR (default ./storage)
-// - on Vercel: a Vercel Blob store (when BLOB_READ_WRITE_TOKEN is set). Every file is stored as PRIVATE, so it can only be read
+// - on Vercel: a Vercel Blob store (when BLOB_READ_WRITE_TOKEN or BLOB_STORE_ID is set). Every file is stored as PRIVATE, so it can only be read
 //   through this application, never by its URL.
 // Files are addressed by keys like "imports/<id>/uploads/<name>" in both cases.
 
@@ -38,7 +38,10 @@ export function blobEnabled(): boolean {
 
 export function blobUploadMode(): "server" | "blob" | "blob-presigned" {
   if (process.env.BLOB_READ_WRITE_TOKEN) return "blob";
-  if (process.env.VERCEL_OIDC_TOKEN && process.env.BLOB_STORE_ID) return "blob-presigned";
+  // OIDC: on Vercel the token comes with each request (the x-vercel-oidc-token header, read by @vercel/oidc), NOT as the
+  // VERCEL_OIDC_TOKEN environment variable, so a connected store is recognised by BLOB_STORE_ID alone. Locally,
+  // `vercel env pull` writes VERCEL_OIDC_TOKEN into .env.local.
+  if (process.env.BLOB_STORE_ID && (process.env.VERCEL || process.env.VERCEL_OIDC_TOKEN)) return "blob-presigned";
   return "server";
 }
 
